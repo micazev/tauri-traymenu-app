@@ -3,65 +3,14 @@
     windows_subsystem = "windows"
 )]
 
-use tauri::{
-    api::shell::open, AppHandle, CustomMenuItem, Manager,
-    SystemTray, SystemTrayEvent, SystemTrayMenu,
-    SystemTrayMenuItem, SystemTraySubmenu,
-};
+mod tray_menu;
+mod utils;
 
-const links: [(&str, &str, &str); 5] = [
-    // social links
-    ("open-social-netlify", "Netlify","https://app.netlify.com/teams/christopherbiscardi/overview"),
-    ("open-social-youtube", "YouTube","https://www.youtube.com/@chrisbiscardi"),
-    ("open-social-twitter", "Twitter","https://twitter.com/"),
-    // github links
-    ("open-github-rust-adventure", "Rust Adventure","https://github.com/rust-adventure"),
-    ("open-github-bevy", "Bevy","https://github.com/bevyengine/bevy"),
-];
+use tauri::{AppHandle, Manager, SystemTray, SystemTrayEvent};
 
 fn main() {
-    let sub_menu_social = {
-        let mut menu = SystemTrayMenu::new();
-        for (id, label, _url) in
-            links.iter().filter(|(id, label, _url)| {
-                id.starts_with("open-social")
-            })
-        {
-            menu = menu.add_item(CustomMenuItem::new(
-                id.to_string(),
-                label.to_string(),
-            ));
-        }
-
-        SystemTraySubmenu::new("Social", menu)
-    };
-    let sub_menu_github = {
-        let mut menu = SystemTrayMenu::new();
-        for (id, label, _url) in
-            links.iter().filter(|(id, label, _url)| {
-                id.starts_with("open-github")
-            })
-        {
-            menu = menu.add_item(CustomMenuItem::new(
-                id.to_string(),
-                label.to_string(),
-            ));
-        }
-
-        SystemTraySubmenu::new("GitHub", menu)
-    };
-    let tray_menu = SystemTrayMenu::new()
-        .add_item(CustomMenuItem::new(
-            "quit".to_string(),
-            "Quit",
-        ))
-        .add_submenu(sub_menu_social)
-        .add_submenu(sub_menu_github)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new(
-            "visibility-toggle".to_string(),
-            "Hide",
-        ));
+    let user_name = utils::get_logged_in_user_name(); // Obtendo o nome do usuário logado do módulo utils
+    let tray_menu = tray_menu::create_tray_menu(&user_name);
 
     let tray = SystemTray::new().with_menu(tray_menu);
 
@@ -95,31 +44,17 @@ fn on_system_tray_event(
                         app.get_window("main").unwrap();
                     match window.is_visible() {
                         Ok(true) => {
-                          window.hide().unwrap();
-                          item_handle.set_title("Show").unwrap();
+                            window.hide().unwrap();
+                            item_handle.set_title("Show").unwrap();
                         },
                         Ok(false) => {
-                          window.show();
-                          item_handle.set_title("Hide").unwrap();
-
+                            window.show();
+                            item_handle.set_title("Hide").unwrap();
                         },
                         Err(e) => unimplemented!("what kind of errors happen here?"),
                     }
                 }
                 "quit" => app.exit(0),
-                s if s.starts_with("open-") => {
-                    if let Some(link) = links
-                        .iter()
-                        .find(|(id, ..)| id == &s)
-                    {
-                        open(
-                            &app.shell_scope(),
-                            link.2,
-                            None,
-                        )
-                        .unwrap();
-                    }
-                }
                 _ => {}
             }
         }
